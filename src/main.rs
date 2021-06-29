@@ -1,9 +1,65 @@
 use rocksdb::{DB, Options, IteratorMode, ColumnFamilyDescriptor};
 use clap::{Arg, App};
 use std::path::Path;
+use std::fs::{File, OpenOptions};
+use std::io::{Read, BufReader};
+use std::fmt::Error;
 
-fn main() {
-    println!("Hello, world!");
+struct AOFHeader {
+    op_code: u8,
+    head_length: u64,
+    body_length: u64
+}
+
+struct AOFMessage {
+    header: AOFHeader,
+    args : Vec<String>
+}
+
+struct AOF {
+
+}
+
+impl AOF {
+    fn load<T: Read>(reader: &mut T) {
+        let mut load_part = |size| {
+            let mut buf = Vec::with_capacity(size);
+            let mut part_reader = reader.take(size as u64);
+            part_reader.read_to_end(&mut buf).unwrap();
+
+            buf
+        };
+
+        let header = AOFHeader {
+            op_code: u8::from_ne_bytes(load_part(1)),
+            head_length: u64::from_ne_bytes(load_part(8)),
+            body_length: u64::from_ne_bytes(load_part(8)),
+        };
+
+        println!("op code: {}, header length: {}, body length: {}", &header.op_code, &header.head_length, &header.body_length);
+        // take the header and body
+        // let key = load_part(&header.head_length as usize) as str;
+        // let value = load_part(&header.body_length as usize) as str;
+
+        // println!("[{}] {} -> {}", &header.op_code, &key, &value);
+
+        // next one
+    }
+}
+
+fn load_aof(aof_path: String) -> bool {
+    if !Path::new(aof_path.as_str()).exists() {
+        return false;
+    }
+
+    // parse the aof file;
+    let mut f = OpenOptions::new().read(true).open(&aof_path)?;
+    let mut reader = BufReader::new(f);
+    AOF::load(&mut reader);
+    return true;
+}
+
+fn load_rocksdb() {
     let matches = App::new("osquery rocksdb checker")
         .version("1.0")
         .author("zouxiaoliang")
@@ -88,4 +144,9 @@ fn main() {
     }
     // 如果需要清空数据库，则打开注释
     // let _ = DB::destroy(&Options::default(), db_path);
+}
+fn main() {
+    println!("Hello, world!");
+    let aof_path = String::from("/Users/zouxiaoliang/workspace/cpp-build-dir/build-osquery-Debug/osquery/tiny.aof");
+    load_aof(aof_path);
 }
