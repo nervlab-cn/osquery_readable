@@ -4,6 +4,7 @@ use std::path::Path;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, BufReader};
 use std::fmt::Error;
+use std::convert::TryInto;
 
 struct AOFHeader {
     op_code: u8,
@@ -20,6 +21,18 @@ struct AOF {
 
 }
 
+fn read_ne_u64(input: &mut &[u8]) -> u64 {
+    let (int_bytes, rest) = input.split_at(std::mem::size_of::<u64>());
+    *input = rest;
+    u64::from_ne_bytes(int_bytes.try_into().unwrap())
+}
+
+fn read_ne_u8(input: &mut &[u8]) -> u8 {
+    let (int_bytes, rest) = input.split_at(std::mem::size_of::<u8>());
+    *input = rest;
+    u8::from_ne_bytes(int_bytes.try_into().unwrap())
+}
+
 impl AOF {
     fn load<T: Read>(reader: &mut T) {
         let mut load_part = |size| {
@@ -31,17 +44,17 @@ impl AOF {
         };
 
         let header = AOFHeader {
-            op_code: u8::from_ne_bytes(load_part(1)),
-            head_length: u64::from_ne_bytes(load_part(8)),
-            body_length: u64::from_ne_bytes(load_part(8)),
+            op_code: read_ne_u8(&mut &*load_part(1)),
+            head_length: read_ne_u64(&mut &*load_part(8)),
+            body_length: read_ne_u64(&mut &*load_part(8)),
         };
 
         println!("op code: {}, header length: {}, body length: {}", &header.op_code, &header.head_length, &header.body_length);
         // take the header and body
-        // let key = load_part(&header.head_length as usize) as str;
-        // let value = load_part(&header.body_length as usize) as str;
+        let key = String::from_utf8(load_part(header.head_length as usize)).unwrap();
+        let value = String::from_utf8(load_part(header.body_length as usize)).unwrap();
 
-        // println!("[{}] {} -> {}", &header.op_code, &key, &value);
+        println!("[{}] {} -> {}", &header.op_code, &key, &value);
 
         // next one
     }
@@ -53,7 +66,7 @@ fn load_aof(aof_path: String) -> bool {
     }
 
     // parse the aof file;
-    let mut f = OpenOptions::new().read(true).open(&aof_path)?;
+    let mut f = OpenOptions::new().read(true).open(&aof_path).unwrap();
     let mut reader = BufReader::new(f);
     AOF::load(&mut reader);
     return true;
